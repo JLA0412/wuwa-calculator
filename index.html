@@ -176,12 +176,15 @@ details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
 
       <fieldset>
         <legend>手上資源</legend>
-        <label for="ast">星聲（含可轉換的月相）<input id="ast" type="number" min="0" step="160" value="32000"></label>
+        <div class="row">
+          <label for="ast">星聲<input id="ast" type="number" min="0" step="160" value="30000"></label>
+          <label for="lun">月相<input id="lun" type="number" min="0" value="2000"></label>
+        </div>
         <div class="row">
           <label for="rTide">浮金波紋<input id="rTide" type="number" min="0" value="45"></label>
           <label for="fTide">鑄潮波紋<input id="fTide" type="number" min="0" value="10"></label>
         </div>
-        <p class="hint">一抽 = 160 星聲。星聲兩池共用，波紋只能用在各自的池子。畫面上的數字是範例，改成你自己的即可。</p>
+        <p class="hint">一抽 = 160 星聲，月相 1:1 換成星聲一起計算。星聲兩池共用，波紋只能用在各自的池子。畫面上的數字是範例，改成你自己的即可。</p>
       </fieldset>
 
       <fieldset>
@@ -341,7 +344,7 @@ details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
     `<div class="item"><label for="use${i}"><input class="pick" id="use${i}" type="checkbox"${i === 5 ? " checked" : ""}><span class="nm">${t.base} 月相<small>NT$${t.price.toLocaleString("en-US")} · 再買 ${t.base + t.bonus}</small></span></label>
      <div class="ctl"><input id="tn${i}" type="number" min="0" max="99" value="1" aria-label="${t.base} 月相買幾個"><label class="dbl" for="dbl${i}"><input id="dbl${i}" type="checkbox">雙倍</label></div></div>`));
 
-  const ids = ["cPity", "cCur", "cTgt", "cGuar", "wOn", "wPity", "wCur", "wTgt", "ast", "rTide", "fTide"]
+  const ids = ["cPity", "cCur", "cTgt", "cGuar", "wOn", "wPity", "wCur", "wTgt", "ast", "lun", "rTide", "fTide"]
     .concat(PACKS.map(k => "pk_" + k.id), PACKS.map(k => "pn_" + k.id), MONTHLY.map(k => "mo_" + k.id), TIERS.map((_, i) => "use" + i), TIERS.map((_, i) => "tn" + i), TIERS.map((_, i) => "dbl" + i));
   const KEY = "wuwa-s6-calc-v3";
   try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s) ids.forEach(id => { if (s[id] === undefined) return; const el = $(id); if (el.type === "checkbox") el.checked = s[id]; else el.value = s[id]; }); } catch (e) {}
@@ -354,7 +357,7 @@ details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
   function run() {
     const cPity = num("cPity", 0, 79), cCur = +$("cCur").value, cTgt = +$("cTgt").value, guar = $("cGuar").checked;
     const wOn = $("wOn").checked, wPity = num("wPity", 0, 79), wCur = +$("wCur").value, wTgt = +$("wTgt").value;
-    const ast = num("ast", 0, 1e9), R = num("rTide", 0, 1e6), F = num("fTide", 0, 1e6);
+    const ast = num("ast", 0, 1e9) + num("lun", 0, 1e9), R = num("rTide", 0, 1e6), F = num("fTide", 0, 1e6);
     const packs = PACKS.map(k => ({ ...k, use: $("pk_" + k.id).checked, n: num("pn_" + k.id, 0, 12) }))
       .concat(MONTHLY.map(k => ({ ...k, use: $("mo_" + k.id).checked, n: 1 })));
     $("md_m2").textContent = MONTHLY[1].desc + (wOn ? "" : "・沒抽專武，波紋用不到");
@@ -376,7 +379,7 @@ details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
     v.textContent = txt; v.style.color = col;
     const goal = (nC ? chainLabel(cTgt) : "") + (nC && nW ? " + " : "") + (nW ? "專武精煉 " + wTgt : "");
     $("heroText").innerHTML = nC + nW === 0 ? "目前設定已經達成目標，調高目標共鳴鏈或精煉試試。" :
-      `目標 <b>${goal}</b>，共需 <b>${nC + nW}</b> 隻限定五星。你手上可抽 <b>${fmt(own + R + (wOn ? F : 0))}</b> 抽（星聲 ${fmt(own)} 抽 + 波紋 ${fmt(R + (wOn ? F : 0))} 抽）。`;
+      `目標 <b>${goal}</b>，共需 <b>${nC + nW}</b> 隻限定五星。你手上可抽 <b>${fmt(own + R + (wOn ? F : 0))}</b> 抽（星聲與月相 ${fmt(own)} 抽 + 波紋 ${fmt(R + (wOn ? F : 0))} 抽）。`;
 
     // stats (total pulls)
     const q50 = quant(total, .5), q90 = quant(total, .9), mx = maxOf(total), mu = mean(total);
