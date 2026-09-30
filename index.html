@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="鳴潮限定角色 6 鏈與專武精煉的抽數、成功機率計算機">
+<title>鳴潮滿鏈計算機</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: left control rail (sticky on desktop) + right results column; stacks on phones. */
+:root {
+  --bg: #eef2f1;
+  --surface: #ffffff;
+  --sunken: #e3e9e8;
+  --ink: #14201e;
+  --ink-2: #4a5a58;
+  --ink-3: #7c8c8a;
+  --line: #d2dbda;
+  --accent: #1c6c74;
+  --accent-soft: rgba(28,108,116,.14);
+  --gold: #9a6d17;
+  --gold-soft: rgba(184,134,43,.16);
+  --good: #2a7a3f; --warn: #a66a00; --bad: #b3372b;
+  --f-display: "Noto Serif TC", "Songti TC", serif;
+  --f-body: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1315; --surface: #151d20; --sunken: #1b2528; --ink: #e6eeec; --ink-2: #a9b8b6; --ink-3: #718281;
+    --line: #26343a; --accent: #62c3ca; --accent-soft: rgba(98,195,202,.16); --gold: #e2b65c; --gold-soft: rgba(226,182,92,.14);
+    --good: #6cc784; --warn: #e8ae45; --bad: #f07c6e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1315; --surface: #151d20; --sunken: #1b2528; --ink: #e6eeec; --ink-2: #a9b8b6; --ink-3: #718281;
+  --line: #26343a; --accent: #62c3ca; --accent-soft: rgba(98,195,202,.16); --gold: #e2b65c; --gold-soft: rgba(226,182,92,.14);
+  --good: #6cc784; --warn: #e8ae45; --bad: #f07c6e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; padding: 0 16px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 32px 56px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 28px; }
+h1 { font-family: var(--f-display); font-weight: 900; font-size: clamp(28px, 4.4vw, 42px); line-height: 1.15; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+h1 .gold { color: var(--gold); }
+.sub { color: var(--ink-2); margin: 6px 0 0; max-width: 56ch; }
+.wave { width: 180px; height: 36px; color: var(--accent); opacity: .7; flex: none; }
+.grid { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+/* controls */
+.rail { display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 860px) { .rail { position: static; } }
+fieldset { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; margin: 0; padding: 14px 16px 16px; display: grid; gap: 12px; }
+legend { font-family: var(--f-display); font-weight: 600; font-size: 15px; padding: 0 6px; margin-left: -6px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+label { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-2); letter-spacing: .02em; }
+input[type=number], select { font: 500 15px var(--f-mono); color: var(--ink); background: var(--sunken); border: 1px solid transparent; border-radius: 7px; padding: 7px 10px; width: 100%; min-width: 0; }
+select { font-family: var(--f-body); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.check input { width: 17px; height: 17px; accent-color: var(--accent); }
+.hint { font-size: 12px; color: var(--ink-3); margin: -4px 0 0; }
+fieldset[data-off="true"] .wp { opacity: .4; pointer-events: none; }
+
+/* results */
+.results { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.hero { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; display: grid; grid-template-columns: auto 1fr; gap: 8px 28px; align-items: center; }
+@media (max-width: 560px) { .hero { grid-template-columns: 1fr; } }
+.big { font: 600 clamp(48px, 9vw, 72px)/1 var(--f-mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.big small { font-size: .42em; margin-left: 2px; color: var(--ink-2); }
+.hero .lbl { font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 99px; border: 1px solid currentColor; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.hero p { margin: 10px 0 0; color: var(--ink-2); font-size: 14px; }
+.hero b { color: var(--ink); font-family: var(--f-mono); font-weight: 600; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+@media (max-width: 640px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { padding: 14px 16px; border-left: 1px solid var(--line); }
+.stat:first-child { border-left: 0; }
+@media (max-width: 640px) { .stat:nth-child(3) { border-left: 0; } .stat:nth-child(n+3) { border-top: 1px solid var(--line); } }
+.stat .k { font-size: 12px; color: var(--ink-3); letter-spacing: .04em; }
+.stat .v { font: 600 24px var(--f-mono); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.stat .v small { font-size: 13px; color: var(--ink-2); font-weight: 400; margin-left: 2px; }
+.stat .s { font-size: 12px; color: var(--ink-2); font-family: var(--f-mono); }
+
+section.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px 20px; }
+h2 { font-family: var(--f-display); font-weight: 600; font-size: 18px; margin: 0 0 2px; }
+.cap { font-size: 13px; color: var(--ink-3); margin: 0 0 14px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: 260px; overflow: visible; }
+.chart text { font: 11px var(--f-mono); fill: var(--ink-3); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font: 12px/1.45 var(--f-mono); padding: 6px 9px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); }
+
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 520px; }
+th { text-align: left; font-size: 12px; font-weight: 500; color: var(--ink-3); padding: 6px 10px; border-bottom: 1px solid var(--line); letter-spacing: .04em; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); font-family: var(--f-mono); font-size: 14px; }
+td:first-child { font-family: var(--f-display); font-weight: 600; }
+tr.tgt td { background: var(--gold-soft); }
+.bar { display: flex; align-items: center; gap: 8px; }
+.bar i { display: block; height: 6px; border-radius: 3px; background: var(--accent); min-width: 2px; }
+.bar span { min-width: 3.6em; text-align: right; }
+.cost { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 640px) { .cost { grid-template-columns: 1fr; } }
+.cost > div { background: var(--sunken); border-radius: 8px; padding: 12px 14px; }
+.cost .up { color: var(--good); }
+.item .ctl { display: flex; align-items: center; gap: 8px; }
+.buy { margin-top: 16px; }
+.buy table { min-width: 440px; }
+.buy td:first-child { font-family: var(--f-body); font-weight: 500; }
+.buy .tag { display: inline-block; font: 600 11px var(--f-body); color: var(--gold); border: 1px solid currentColor; border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+.buy tfoot td { border-bottom: 0; font-weight: 600; font-size: 16px; }
+.buy .left { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 0; }
+.k2 { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--ink-2); margin-bottom: -6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.k2 span { font-size: 11.5px; color: var(--ink-3); }
+.items { display: grid; gap: 4px; }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 7px; }
+.item:has(.pick:checked) { background: var(--accent-soft); }
+.item > label { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; cursor: pointer; }
+.item > label input { width: 16px; height: 16px; accent-color: var(--accent); flex: none; margin: 0; }
+.item .nm { display: grid; line-height: 1.3; }
+.item .nm small { font: 11.5px var(--f-mono); color: var(--ink-3); }
+.item input[type=number] { width: 58px; padding: 4px 8px; font-size: 14px; }
+.item .dbl { font-size: 12px; color: var(--ink-2); gap: 5px; white-space: nowrap; display: flex; align-items: center; }
+.item .dbl input { width: 14px; height: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips label { display: flex; align-items: center; gap: 5px; color: var(--ink); font: 500 13px var(--f-mono); background: var(--sunken); border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+.chips input { accent-color: var(--accent); margin: 0; }
+details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+.prices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin: 10px 0 8px; }
+.cost .k { font-size: 12px; color: var(--ink-3); }
+.cost .v { font: 600 20px var(--f-mono); margin-top: 2px; }
+.cost .s { font: 12px var(--f-mono); color: var(--ink-2); }
+.notes { font-size: 12.5px; color: var(--ink-3); line-height: 1.7; }
+.notes ul { margin: 6px 0 0; padding-left: 1.2em; }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .25s ease; } }
+</style>
+<style>html{color-scheme:light}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>鳴潮 <span class="gold">滿鏈</span> 計算機</h1>
+      <p class="sub">輸入目前的保底進度和手上的星聲、波紋，算出抽到 6 鏈（加上專武）要多少抽、成功機率多少、還差多少。</p>
+    </div>
+    <svg class="wave" viewBox="0 0 180 36" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 18 Q12 4 22 18 T42 18 T62 18 Q72 -2 82 18 T102 18 Q112 34 122 18 T142 18 T162 18 T178 18"/></svg>
+  </header>
+
+  <div class="grid">
+    <form class="rail" id="form" onsubmit="event.preventDefault()">
+      <fieldset>
+        <legend>限定角色池</legend>
+        <div class="row">
+          <label for="cPity">目前墊抽數<input id="cPity" type="number" min="0" max="79" value="12"></label>
+          <label for="cCur">目前共鳴鏈
+            <select id="cCur"></select></label>
+        </div>
+        <label for="cTgt">目標共鳴鏈<select id="cTgt"></select></label>
+        <label class="check" for="cGuar"><input id="cGuar" type="checkbox">上一隻五星歪了（本次大保底）</label>
+      </fieldset>
+
+      <fieldset id="wSet">
+        <legend>限定武器池</legend>
+        <label class="check" for="wOn"><input id="wOn" type="checkbox" checked>一起抽專武</label>
+        <div class="row wp">
+          <label for="wPity">目前墊抽數<input id="wPity" type="number" min="0" max="79" value="0"></label>
+          <label for="wCur">目前精煉<select id="wCur"></select></label>
+        </div>
+        <label class="wp" for="wTgt">目標精煉<select id="wTgt"></select></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>手上資源</legend>
+        <label for="ast">星聲（含可轉換的月相）<input id="ast" type="number" min="0" step="160" value="32000"></label>
+        <div class="row">
+          <label for="rTide">浮金波紋<input id="rTide" type="number" min="0" value="45"></label>
+          <label for="fTide">鑄潮波紋<input id="fTide" type="number" min="0" value="10"></label>
+        </div>
+        <p class="hint">一抽 = 160 星聲。星聲兩池共用，波紋只能用在各自的池子。畫面上的數字是範例，改成你自己的即可。</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>要買的禮包</legend>
+        <p class="hint" style="margin:0">勾選要買的禮包並填數量，右邊會加總花費，並算出買完後的達成機率。</p>
+        <div class="k2">月卡<span>買幾個</span></div>
+        <div class="items" id="packList"></div>
+        <div class="k2">月禮包<span>每月各一次</span></div>
+        <div class="items" id="monthList"></div>
+        <div class="k2">月相儲值<span>買幾個 · 首儲雙倍</span></div>
+        <div class="items" id="tierList"></div>
+        <p class="hint">月禮包每月名稱不同，價格和內容固定。浮金波紋只能抽角色池、鑄潮波紋只能抽武器池，會分開計算。</p>
+      </fieldset>
+    </form>
+
+    <div class="results">
+      <div class="hero">
+        <div>
+          <div class="lbl">用現有資源達成目標的機率</div>
+          <div class="big" id="pWin">–</div>
+        </div>
+        <div>
+          <span class="pill" id="verdict">–</span>
+          <p id="heroText">–</p>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="k">期望抽數</div><div class="v" id="sMean">–</div><div class="s" id="sMeanS"></div></div>
+        <div class="stat"><div class="k">50% 機率內</div><div class="v" id="sP50">–</div><div class="s" id="sP50S"></div></div>
+        <div class="stat"><div class="k">90% 機率內</div><div class="v" id="sP90">–</div><div class="s" id="sP90S"></div></div>
+        <div class="stat"><div class="k">最慘情況（全歪）</div><div class="v" id="sMax">–</div><div class="s" id="sMaxS"></div></div>
+      </div>
+
+      <section class="card">
+        <h2>要用星聲抽幾抽才夠</h2>
+        <p class="cap">先用完波紋，剩下的每一抽都要花 160 星聲。曲線是「用星聲抽到第 N 抽前完成目標」的累積機率，虛線是你目前星聲能抽的次數。</p>
+        <div class="chart" id="chart"><svg id="svg" role="img" aria-label="累積機率曲線"></svg><div class="tip" id="tip" hidden></div></div>
+      </section>
+
+      <section class="card">
+        <h2>目前花費多少</h2>
+        <p class="cap">加總左邊打勾的禮包。月相 1:1 換成星聲（兩池共用），浮金波紋只加到角色池、鑄潮波紋只加到武器池，再重新計算達成機率。</p>
+        <div class="cost" id="cost"></div>
+        <div class="buy" id="buy"></div>
+      </section>
+
+      <section class="card">
+        <h2>各共鳴鏈的達成率</h2>
+        <p class="cap" id="chainCap">只看角色池，假設星聲全部先投入角色。</p>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>共鳴鏈</th><th>還需幾隻</th><th>期望抽數</th><th>90% 內抽數</th><th>用現有資源達成率</th></tr></thead>
+          <tbody id="chainBody"></tbody>
+        </table></div>
+      </section>
+
+      <div class="notes">
+        計算方式是精確的機率分布（不是模擬），規則採社群統計的模型：
+        <ul>
+          <li>五星基礎機率 0.8%，第 66 抽起機率逐抽提升，第 80 抽必出五星。實際曲線官方未公布，數字是估計值。</li>
+          <li>限定角色池：出五星時 50% 為限定角色；歪了之後下一隻五星必定是限定角色。</li>
+          <li>限定武器池：出五星必定是限定武器。兩池保底互不繼承。</li>
+          <li>沒有計入餘波珊瑚兌換的波紋，實際需求會略少一些。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const ASTRITE = 160, PACK = 6480;
+
+  // ---- probability model ----
+  function rate(i) {
+    if (i >= 80) return 1;
+    if (i <= 65) return 0.008;
+    if (i <= 70) return 0.008 + 0.04 * (i - 65);
+    if (i <= 75) return 0.208 + 0.08 * (i - 70);
+    return 0.608 + 0.05 * (i - 75);
+  }
+  // pmf of pulls until next 5★ given current pity c
+  function next5(c) {
+    const a = [0]; let surv = 1;
+    for (let i = c + 1; i <= 80; i++) { const p = rate(i); a.push(surv * p); surv *= 1 - p; }
+    return a;
+  }
+  function conv(a, b) {
+    const r = new Float64Array(a.length + b.length - 1);
+    for (let i = 0; i < a.length; i++) { const x = a[i]; if (x < 1e-15) continue; for (let j = 0; j < b.length; j++) r[i + j] += x * b[j]; }
+    return Array.from(r);
+  }
+  const mix = (a, b, wa) => { const n = Math.max(a.length, b.length), r = []; for (let i = 0; i < n; i++) r.push(wa * (a[i] || 0) + (1 - wa) * (b[i] || 0)); return r; };
+  const F0 = next5(0);
+  const LIM0 = mix(F0, conv(F0, F0), 0.5);
+  function charDist(pity, guar, n) {
+    if (n <= 0) return [1];
+    const f = next5(pity);
+    let d = guar ? f : mix(f, conv(f, F0), 0.5);
+    for (let k = 1; k < n; k++) d = conv(d, LIM0);
+    return d;
+  }
+  function weapDist(pity, n) {
+    if (n <= 0) return [1];
+    let d = next5(pity);
+    for (let k = 1; k < n; k++) d = conv(d, F0);
+    return d;
+  }
+  // pulls that must be paid with astrite, after free tides
+  function shift(d, free) {
+    const r = [0]; for (let i = 0; i < d.length; i++) { const k = Math.max(0, i - free); r[k] = (r[k] || 0) + d[i]; }
+    for (let i = 0; i < r.length; i++) if (r[i] === undefined) r[i] = 0;
+    return r;
+  }
+  const mean = d => d.reduce((s, p, i) => s + p * i, 0);
+  const cdfAt = (d, x) => { let s = 0; for (let i = 0; i <= Math.min(x, d.length - 1); i++) s += d[i]; return Math.min(1, s); };
+  const quant = (d, q) => { let s = 0; for (let i = 0; i < d.length; i++) { s += d[i]; if (s >= q - 1e-12) return i; } return d.length - 1; };
+  const maxOf = d => { for (let i = d.length - 1; i >= 0; i--) if (d[i] > 1e-13) return i; return 0; };
+
+  // ---- controls ----
+  const chainLabel = v => v < 0 ? "未持有" : v + " 鏈";
+  function fill(sel, from, to, lab, val) { sel.innerHTML = ""; for (let v = from; v <= to; v++) sel.add(new Option(lab(v), v)); sel.value = val; }
+  fill($("cCur"), -1, 6, chainLabel, -1);
+  fill($("cTgt"), 0, 6, chainLabel, 6);
+  fill($("wCur"), 0, 5, v => v === 0 ? "未持有" : "精煉 " + v, 0);
+  fill($("wTgt"), 1, 5, v => "精煉 " + v, 1);
+
+  // in-game TWD prices. Top-up tiers: base lunite, bonus on repeat purchase; first purchase gives base × 2.
+  const TIERS = [
+    { base: 60, bonus: 0, price: 30 },
+    { base: 300, bonus: 30, price: 170 },
+    { base: 980, bonus: 110, price: 490 },
+    { base: 1980, bonus: 260, price: 990 },
+    { base: 3280, bonus: 600, price: 1690 },
+    { base: 6480, bonus: 1600, price: 3290 },
+  ];
+  // limited packs: ast = astrite/lunite, rt/ft = radiant/forging tides (1 tide = 1 pull)
+  const PACKS = [
+    { id: "sm", name: "小月卡", desc: "NT$170 · 300 月相（只算儲值當下）", price: 170, ast: 300, rt: 0, ft: 0, on: true, max: 1 },
+    { id: "bg", name: "大月卡（先約電台）", desc: "NT$330 · 680 星聲 + 5 浮金波紋", price: 330, ast: 680, rt: 5, ft: 0, on: true, max: 1 },
+  ];
+  // monthly packs: fixed price/value each month (name changes). val = astrite-equivalent (7.5 / 18.13 pulls).
+  const MONTHLY = [
+    { id: "m1", name: "浮金貨匣（角色）", price: 330, ast: 400, rt: 5, ft: 0 },
+    { id: "m2", name: "鑄潮貨匣（武器）", price: 330, ast: 400, rt: 0, ft: 5 },
+    { id: "m3", name: "大浮金貨匣（角色）", price: 990, ast: 1300, rt: 10, ft: 0 },
+  ];
+  const contents = k => [k.ast && k.ast.toLocaleString("en-US") + " 星聲", k.rt && k.rt + " 浮金", k.ft && k.ft + " 鑄潮"].filter(Boolean).join(" + ");
+  MONTHLY.forEach(k => k.desc = "NT$" + k.price + " · " + contents(k));
+  MONTHLY.forEach(k => $("monthList").insertAdjacentHTML("beforeend",
+    `<div class="item"><label for="mo_${k.id}"><input class="pick" id="mo_${k.id}" type="checkbox"><span class="nm">${k.name}<small id="md_${k.id}">${k.desc}</small></span></label></div>`));
+  PACKS.forEach(k => $("packList").insertAdjacentHTML("beforeend",
+    `<div class="item"><label for="pk_${k.id}"><input class="pick" id="pk_${k.id}" type="checkbox"${k.on ? " checked" : ""}><span class="nm">${k.name}<small id="pd_${k.id}">${k.desc}</small></span></label>
+     <input id="pn_${k.id}" type="number" min="0" max="12" value="${k.max}" aria-label="${k.name}買幾個"></div>`));
+  TIERS.forEach((t, i) => $("tierList").insertAdjacentHTML("beforeend",
+    `<div class="item"><label for="use${i}"><input class="pick" id="use${i}" type="checkbox"${i === 5 ? " checked" : ""}><span class="nm">${t.base} 月相<small>NT$${t.price.toLocaleString("en-US")} · 再買 ${t.base + t.bonus}</small></span></label>
+     <div class="ctl"><input id="tn${i}" type="number" min="0" max="99" value="1" aria-label="${t.base} 月相買幾個"><label class="dbl" for="dbl${i}"><input id="dbl${i}" type="checkbox">雙倍</label></div></div>`));
+
+  const ids = ["cPity", "cCur", "cTgt", "cGuar", "wOn", "wPity", "wCur", "wTgt", "ast", "rTide", "fTide"]
+    .concat(PACKS.map(k => "pk_" + k.id), PACKS.map(k => "pn_" + k.id), MONTHLY.map(k => "mo_" + k.id), TIERS.map((_, i) => "use" + i), TIERS.map((_, i) => "tn" + i), TIERS.map((_, i) => "dbl" + i));
+  const KEY = "wuwa-s6-calc-v3";
+  try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s) ids.forEach(id => { if (s[id] === undefined) return; const el = $(id); if (el.type === "checkbox") el.checked = s[id]; else el.value = s[id]; }); } catch (e) {}
+  function save() { try { const s = {}; ids.forEach(id => { const el = $(id); s[id] = el.type === "checkbox" ? el.checked : el.value; }); localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+
+  const num = (id, lo, hi) => { let v = Math.floor(Number($(id).value) || 0); return Math.min(hi, Math.max(lo, v)); };
+  const fmt = n => Math.round(n).toLocaleString("en-US");
+  const pct = p => (p >= 0.9995 ? "100" : p < 0.0005 && p > 0 ? "<0.1" : (p * 100).toFixed(1)) + "%";
+
+  function run() {
+    const cPity = num("cPity", 0, 79), cCur = +$("cCur").value, cTgt = +$("cTgt").value, guar = $("cGuar").checked;
+    const wOn = $("wOn").checked, wPity = num("wPity", 0, 79), wCur = +$("wCur").value, wTgt = +$("wTgt").value;
+    const ast = num("ast", 0, 1e9), R = num("rTide", 0, 1e6), F = num("fTide", 0, 1e6);
+    const packs = PACKS.map(k => ({ ...k, use: $("pk_" + k.id).checked, n: num("pn_" + k.id, 0, 12) }))
+      .concat(MONTHLY.map(k => ({ ...k, use: $("mo_" + k.id).checked, n: 1 })));
+    $("md_m2").textContent = MONTHLY[1].desc + (wOn ? "" : "・沒抽專武，波紋用不到");
+    const tiers = TIERS.map((t, i) => ({ ...t, i, use: $("use" + i).checked, n: num("tn" + i, 0, 99), dbl: $("dbl" + i).checked }));
+    $("wSet").dataset.off = !wOn;
+    save();
+
+    const nC = Math.max(0, cTgt - cCur), nW = wOn ? Math.max(0, wTgt - wCur) : 0;
+    const C = charDist(cPity, guar, nC), W = weapDist(wPity, nW);
+    const total = conv(C, W);
+    const need = conv(shift(C, R), shift(W, F));
+    const own = Math.floor(ast / ASTRITE);
+    const pWin = cdfAt(need, own);
+
+    // hero
+    $("pWin").innerHTML = (pWin >= 0.9995 ? "100" : (pWin * 100).toFixed(1)) + "<small>%</small>";
+    const v = $("verdict");
+    const [txt, col] = nC + nW === 0 ? ["已達成", "var(--good)"] : pWin >= 0.9 ? ["穩了", "var(--good)"] : pWin >= 0.5 ? ["有機會", "var(--accent)"] : pWin >= 0.1 ? ["看運氣", "var(--warn)"] : ["資源不足", "var(--bad)"];
+    v.textContent = txt; v.style.color = col;
+    const goal = (nC ? chainLabel(cTgt) : "") + (nC && nW ? " + " : "") + (nW ? "專武精煉 " + wTgt : "");
+    $("heroText").innerHTML = nC + nW === 0 ? "目前設定已經達成目標，調高目標共鳴鏈或精煉試試。" :
+      `目標 <b>${goal}</b>，共需 <b>${nC + nW}</b> 隻限定五星。你手上可抽 <b>${fmt(own + R + (wOn ? F : 0))}</b> 抽（星聲 ${fmt(own)} 抽 + 波紋 ${fmt(R + (wOn ? F : 0))} 抽）。`;
+
+    // stats (total pulls)
+    const q50 = quant(total, .5), q90 = quant(total, .9), mx = maxOf(total), mu = mean(total);
+    const set = (id, n) => { $(id).innerHTML = fmt(n) + "<small>抽</small>"; $(id + "S").textContent = fmt(n * ASTRITE) + " 星聲"; };
+    set("sMean", mu); set("sP50", q50); set("sP90", q90); set("sMax", mx);
+
+    // cost cards
+    const items = [];
+    packs.forEach(k => { if (k.use && k.n > 0) items.push({ name: k.name, n: k.n, ast: k.n * k.ast, rt: k.n * k.rt, ft: k.n * k.ft, cost: k.n * k.price, note: k.ft && !wOn ? "沒抽專武，鑄潮用不到" : "" }); });
+    tiers.forEach(t => {
+      if (!t.use || !t.n) return;
+      if (t.dbl) items.push({ name: t.base + " 月相", dbl: true, n: 1, ast: t.base * 2, rt: 0, ft: 0, cost: t.price });
+      const r = t.n - (t.dbl ? 1 : 0);
+      if (r > 0) items.push({ name: t.base + " 月相", n: r, ast: r * (t.base + t.bonus), rt: 0, ft: 0, cost: r * t.price });
+    });
+    const sum = f => items.reduce((s, it) => s + it[f], 0);
+    const gAst = sum("ast"), gR = sum("rt"), gF = wOn ? sum("ft") : 0, spend = sum("cost");
+    // tides go to their own banner only; astrite/lunite is shared
+    const needAfter = conv(shift(C, R + gR), shift(W, F + gF));
+    const ownAfter = Math.floor((ast + gAst) / ASTRITE), pAfter = cdfAt(needAfter, ownAfter);
+    const lack90 = Math.max(0, quant(needAfter, .9) - ownAfter) * ASTRITE;
+    const pullsGot = Math.floor((ast + gAst) / ASTRITE) - own + gR + gF;
+    const got = gAst + ASTRITE * (gR + gF);
+    const gain = pAfter - pWin;
+    $("cost").innerHTML = `
+      <div><div class="k">總花費</div><div class="v">NT$${fmt(spend)}</div><div class="s">${items.length ? "平均每抽 NT$" + (got ? (spend / (got / ASTRITE)).toFixed(1) : "–") : "還沒勾選禮包"}</div></div>
+      <div><div class="k">可多抽</div><div class="v">${fmt(pullsGot)} 抽</div><div class="s">${fmt(gAst)} 星聲 · ${fmt(gR)} 浮金 · ${fmt(gF)} 鑄潮</div></div>
+      <div><div class="k">買完後達成機率</div><div class="v">${pct(pAfter)}</div><div class="s">現在 ${pct(pWin)}${gain > 0.0005 ? ` <span class="up">+${(gain * 100).toFixed(1)}%</span>` : ""}</div></div>`;
+    if (!items.length) $("buy").innerHTML = `<p class="left">在左邊「要買的禮包」勾選要買的月卡、月禮包或月相儲值，這裡會列出明細和總花費。</p>`;
+    else {
+      const rows = items.map(it => `<tr><td>${it.name}${it.dbl ? '<span class="tag">首儲雙倍</span>' : ""}${it.note ? `<span class="tag">${it.note}</span>` : ""}</td><td>× ${it.n}</td><td>${contents(it)}</td><td>NT$${fmt(it.cost)}</td></tr>`);
+      $("buy").innerHTML = `<div class="tbl-wrap"><table><thead><tr><th>項目</th><th>數量</th><th>獲得</th><th>花費</th></tr></thead><tbody>${rows.join("")}</tbody>
+        <tfoot><tr><td>合計</td><td></td><td>${contents({ ast: gAst, rt: gR, ft: sum("ft") }) || "–"}</td><td>NT$${fmt(spend)}</td></tr></tfoot></table></div>
+        <p class="left">${nC + nW === 0 ? "目前設定已經達成目標。" : lack90 ? `買完後要到 90% 成功率還差 ${fmt(lack90)} 星聲（約 ${fmt(lack90 / ASTRITE)} 抽）。` : "買完後已經有 90% 以上的機率達成目標。"}</p>`;
+    }
+
+    // chain table
+    const charOwn = own + R;
+    $("chainCap").textContent = wOn && nW ? `只看角色池，假設 ${fmt(own)} 抽星聲全部先投入角色（加上浮金波紋共 ${fmt(charOwn)} 抽）。` : `只看角色池：星聲 + 浮金波紋共 ${fmt(charOwn)} 抽。`;
+    const rows = [];
+    for (let t = Math.max(0, cCur + 1); t <= 6; t++) {
+      const n = t - cCur, d = charDist(cPity, guar, n), p = cdfAt(d, charOwn);
+      rows.push(`<tr class="${t === cTgt ? "tgt" : ""}"><td>${chainLabel(t)}</td><td>${n}</td><td>${fmt(mean(d))}</td><td>${fmt(quant(d, .9))}</td><td><div class="bar"><span>${pct(p)}</span><i style="width:${Math.max(1, p * 120)}px"></i></div></td></tr>`);
+    }
+    $("chainBody").innerHTML = rows.length ? rows.join("") : `<tr><td colspan="5" style="font-family:var(--f-body);color:var(--ink-3)">已經滿鏈了</td></tr>`;
+
+    drawChart(need, own);
+  }
+
+  // ---- chart ----
+  let chartState = null;
+  function drawChart(d, own) {
+    const svg = $("svg"), W = svg.clientWidth || 600, H = 260, m = { l: 40, r: 14, t: 12, b: 28 };
+    const xmax = Math.max(10, maxOf(d), own) ;
+    const niceStep = r => { const raw = r / 6, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; };
+    const step = niceStep(xmax), X1 = Math.ceil(xmax / step) * step;
+    const x = v => m.l + (v / X1) * (W - m.l - m.r), y = p => m.t + (1 - p) * (H - m.t - m.b);
+    let cum = 0; const pts = [];
+    for (let i = 0; i <= X1; i++) { cum += d[i] || 0; pts.push([i, Math.min(1, cum)]); }
+    const line = pts.map(([i, p], k) => (k ? "L" : "M") + x(i).toFixed(1) + " " + y(p).toFixed(1)).join("");
+    let g = `<defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>`;
+    [0, .25, .5, .75, 1].forEach(p => { g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(p)}" y2="${y(p)}" stroke="var(--line)" stroke-width="1"/><text x="${m.l - 6}" y="${y(p) + 4}" text-anchor="end">${p * 100}%</text>`; });
+    for (let v = 0; v <= X1; v += step) g += `<text x="${x(v)}" y="${H - 8}" text-anchor="middle">${v}</text>`;
+    g += `<path d="${line}L${x(X1)} ${y(0)}L${x(0)} ${y(0)}Z" fill="url(#gf)"/>`;
+    g += `<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
+    const po = cdfAt(d, own), ox = x(Math.min(own, X1));
+    g += `<line x1="${ox}" x2="${ox}" y1="${m.t}" y2="${y(0)}" stroke="var(--gold)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+    g += `<circle cx="${ox}" cy="${y(po)}" r="5" fill="var(--gold)" stroke="var(--surface)" stroke-width="2"/>`;
+    const right = ox > W - 150;
+    g += `<text x="${ox + (right ? -8 : 8)}" y="${m.t + 12}" text-anchor="${right ? "end" : "start"}" style="fill:var(--gold);font-weight:600">你的星聲 ${own} 抽 · ${pct(po)}</text>`;
+    g += `<line id="xh" y1="${m.t}" y2="${y(0)}" stroke="var(--ink-3)" stroke-width="1" visibility="hidden"/><circle id="xd" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>`;
+    g += `<rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent" id="hit"/>`;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.innerHTML = g;
+    chartState = { pts, x, y, X1, m, W };
+    const hit = $("hit"), tip = $("tip"), xh = $("xh"), xd = $("xd");
+    function move(e) {
+      const r = svg.getBoundingClientRect(), px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+      const i = Math.max(0, Math.min(X1, Math.round((px - m.l) / (W - m.l - m.r) * X1))), p = pts[i][1];
+      xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("visibility", "visible");
+      xd.setAttribute("cx", x(i)); xd.setAttribute("cy", y(p)); xd.setAttribute("visibility", "visible");
+      tip.hidden = false; tip.style.left = x(i) + "px"; tip.style.top = y(p) + "px";
+      tip.innerHTML = `星聲 ${i} 抽（${fmt(i * ASTRITE)}）<br>達成機率 ${pct(p)}`;
+    }
+    function leave() { tip.hidden = true; xh.setAttribute("visibility", "hidden"); xd.setAttribute("visibility", "hidden"); }
+    hit.addEventListener("mousemove", move); hit.addEventListener("touchmove", move, { passive: true });
+    hit.addEventListener("mouseleave", leave); hit.addEventListener("touchend", leave);
+  }
+
+  $("tierList").addEventListener("change", e => {
+    const m = e.target.id.match(/^(dbl|use)(\d)$/); if (!m) return;
+    if (m[1] === "dbl" && e.target.checked) $("use" + m[2]).checked = true;
+    if (m[1] === "use" && !e.target.checked) $("dbl" + m[2]).checked = false;
+  });
+  $("form").addEventListener("input", run);
+  $("form").addEventListener("change", run);
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(run, 120); });
+  run();
+})();
+</script>
+</body>
+</html>
